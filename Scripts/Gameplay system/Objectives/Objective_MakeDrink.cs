@@ -5,6 +5,7 @@ using System.Linq;
 using ModestTree;
 using UnityEngine.UI;
 using HT;
+using TMPro;
 
 namespace WN
 {
@@ -14,15 +15,15 @@ namespace WN
         private readonly List<Recipie> currentlySelectedRecipies = new();
         private readonly List<Recipie> randomlyChoosenRecipies = new();
 
-        private int bottlesLeft;
+        [SerializeField] private int bottlesLeft;
         private int totalBottleStreak;
         private int targetCoin;
         private int outstandingTax;
-        private float streakDuration = 60;
+        private bool isFreshLevel = true;
+        private int hasCoinBooster = 1;
         private ProgressionData _data;
 
         private readonly List<(int, int)> defaultIndicies = new();
-        private List<(int, int)> randIndicies = new();
         private List<int> recipieIndicies = new();
 
         [Header("Table Congif")]
@@ -38,6 +39,7 @@ namespace WN
         [SerializeField] private UI_GameOver_View gameover_view;
         [SerializeField] private UI_Toast_TaxDialog taxDialog;
         [SerializeField] private UI_Fill_View level_view;
+        [SerializeField] private TextMeshProUGUI levelText;
         [SerializeField] private UI_Fill_View streak_view;
 
         [Header("Content")]
@@ -46,7 +48,10 @@ namespace WN
         [SerializeField] private Economy economy;
         [SerializeField] private Bottle bottlePrefab;
         [SerializeField] private Fruit fruitPrefab;
+        [SerializeField] private CoinBooster coinBoostPrefab;
         [SerializeField] private List<Recipie> availableReciepe;
+
+        private ContentGenerator contentGenerator;
 
 
 
@@ -56,58 +61,152 @@ namespace WN
         {
             gameover_view.gameObject.SetActive(false);
             levelUpDialog.gameObject.SetActive(false);
+
+            contentGenerator = new();
         }
 
         public void StartObjective(ProgressionData data, Action OnComplete)
         {
             _data = data;
-
-            randIndicies = defaultIndicies.GetRange(0, defaultIndicies.Count);
-
-            recipieIndicies.Clear();
-            randomlyChoosenRecipies.Clear();
-
             complete_callback = OnComplete;
 
+            
             streak_view.SetFill(data.streak);
             level_view.SetFill(data.LEVEL);
-
-            targetCoin = ResolveCoinsByLevel(data.LEVEL);
-           // targetCoin = 1;
-
-            streakDuration = 30;
-            coin_View.SetTargetCoin(targetCoin);
+            levelText.text = data.LEVEL.ToString();
 
 
             outstandingTax = database.dBValues.db_outstanding_tax;
-            if (outstandingTax != 0)
-            {
-                ShowTaxDialog(FixOutstandingTaxation);
-                return;
-            }
+            if (outstandingTax != 0) { ShowTaxDialog(FixOutstandingTaxation); return; }
 
-            tableSystem.SpawnGridItems(GenerateBottlesWithContents(), GenerateFruits(), Callback_Clear_SelectedRecipies);
-            timer_view.SetTimer(streakDuration, CompleteStreak).Forget();
-            tableSystem.isBoardActive = true;
+            if (isFreshLevel)
+            {
+                targetCoin = _data.GetNextLevelTargetCoins(coin.account_balance);
+                isFreshLevel = false;
+            }
+            coin_View.SetTargetCoin(targetCoin);
+            
+            ClearObjectiveData();
+            //Create_Simple_ObjectiveDataByProgression();
+            Create_Simple_ObjectiveData_With_Coin_ByProgression();
         }
+
 
         public void QuitObjective()
         {
-
             totalBottleStreak = 0;
             bottlesLeft = 0;
-            tableSystem.CleanSpawnedItems();
-            Callback_Clear_SelectedRecipies();
-            recipieIndicies.Clear();
-            randomlyChoosenRecipies.Clear();
+            ClearObjectiveData();
             tableSystem.isBoardActive = false;
             timer_view.StopTimer(true);
 
             levelUpDialog.gameObject.SetActive(false);
             gameover_view.gameObject.SetActive(false);
             taxDialog.gameObject.SetActive(false);
-            //complete_callback = null;
+        }
 
+        private void ClearObjectiveData()
+        {
+            recipieIndicies.Clear();
+            randomlyChoosenRecipies.Clear();
+
+            tableSystem.CleanSpawnedItems();
+            Callback_Clear_SelectedRecipies();
+        }
+
+        private void Create_Simple_ObjectiveDataByProgression()
+        {
+            BottleContentData bottleContentData = contentGenerator.GenerateBottlesWithContents(
+                _data, bottlePrefab, tableSystem, tableSystem.indexForRandomPoints);
+            foreach (KeyValuePair<(int, int), Bottle> keyValue in bottleContentData.bottles)
+            {
+                keyValue.Value.CreateData(GenerateRandomRecipies(), OnBottleSelected);
+            }
+
+            Dictionary<(int, int), Fruit> generatedFruits = contentGenerator.GenerateFruits(
+                fruitPrefab, tableSystem, randomlyChoosenRecipies, OnFruitAdded);
+
+            tableSystem.SpawnGridItems(bottleContentData.bottles, generatedFruits, Callback_Clear_SelectedRecipies);
+            timer_view.SetTimer(30, CompleteStreak).Forget();
+
+            bottlesLeft = bottleContentData.totalBottlesGenerated;
+            totalBottleStreak += bottleContentData.totalBottlesGenerated;
+
+            tableSystem.isBoardActive = true;
+
+            PowerUps();
+        }
+
+        private void Create_Simple_ObjectiveData_With_Coin_ByProgression()
+        {
+            int size = tableSystem.indexForRandomPoints.Count;
+
+            List<(int, int)> indexForRandomPoints = tableSystem.indexForRandomPoints.GetRange(0, size);
+
+            BottleContentData bottleContentData = contentGenerator.GenerateBottlesWithContents(
+                _data, bottlePrefab, tableSystem, indexForRandomPoints);
+            foreach (KeyValuePair<(int, int), Bottle> keyValue in bottleContentData.bottles)
+            {
+                keyValue.Value.CreateData(GenerateRandomRecipies(), OnBottleSelected);
+            }
+
+            Dictionary<(int, int), Fruit> generatedFruits = contentGenerator.GenerateFruits(
+                fruitPrefab, tableSystem, randomlyChoosenRecipies, OnFruitAdded);
+
+            BottleContentData generatedCoinData = contentGenerator.GenerateCoinBoosters(
+                _data, coinBoostPrefab, tableSystem);
+            foreach (KeyValuePair<(int, int), CoinBooster> keyValue in generatedCoinData.coins)
+            {
+                keyValue.Value.CreateData(OnCoinBoosterAdded);
+            }
+
+            tableSystem.SpawnGridItemsWithCoinBoost(
+                bottleContentData.bottles,
+                generatedFruits, generatedCoinData.coins,
+                Callback_Clear_SelectedRecipies);
+
+            timer_view.SetTimer(50, CompleteStreak).Forget();
+            bottlesLeft = bottleContentData.totalBottlesGenerated;
+            totalBottleStreak += bottleContentData.totalBottlesGenerated;
+
+            tableSystem.isBoardActive = true;
+
+            PowerUps();
+        }
+
+        private void PowerUps()
+        {
+            if (database.dBValues.db_unburn_remain < 2)
+            {
+                Ads.Instance.Reward_Add_Two_Unburns();
+            }
+            if (isFreshLevel)
+            {
+                Ads.Instance.Reward_Add_Time_Reset();
+            }
+        }
+
+        private List<Recipie> GenerateRandomRecipies()
+        {
+            (int, int) range = _data.GetReceipeRangeForLevel();
+            int randRecpCount = UnityEngine.Random.Range(range.Item1, range.Item2);
+
+            recipieIndicies = Enumerable.Range(0, availableReciepe.Count - 1).ToList();
+            List<Recipie> data = new();
+            for (int i = 0; i < randRecpCount; i++)
+            {
+                int index = UnityEngine.Random.Range(0, recipieIndicies.Count);
+                int val = recipieIndicies[index];
+
+                Recipie recipie = availableReciepe[val];
+                data.Add(recipie);
+                if (!randomlyChoosenRecipies.Contains(recipie))
+                {
+                    randomlyChoosenRecipies.Add(recipie);
+                }
+                recipieIndicies.RemoveAt(index);
+            }
+            return data;
         }
 
         private void ContinueCallback()
@@ -130,8 +229,8 @@ namespace WN
                     levelUpDialog.Print(_data.LEVEL, "", "X10 Coins", "Continue", () => { }, ContinueCallback);
                     _data.LevelUp();
                     database.Write_Level(_data.LEVEL);
-                    targetCoin = _data.GetNextLevelTargetCoins(coin.account_balance);
-                    //targetCoin = 1;
+
+                    isFreshLevel = true;
                 }
                 else
                 {
@@ -169,7 +268,6 @@ namespace WN
 
         private void ApplyTaxation()
         {
-            Debug.Log("should remove " + outstandingTax);
             coin.Debit(outstandingTax);
             outstandingTax = 0;
             database.Write_Coins();
@@ -187,85 +285,13 @@ namespace WN
         }
 
 
-        private Dictionary<(int, int), Bottle> GenerateBottlesWithContents()
+        private void Callback_Clear_SelectedRecipies()
         {
-            (int, int) range = _data.GetBottleRangeForLevel();
-            int numBottles = UnityEngine.Random.Range(range.Item1, range.Item2);
-
-            Dictionary<(int, int), Bottle> value = new();
-            for (int i = 0; i < numBottles + 1; i++)
-            {
-                (int, int) point = GenerateRandomGridPoint();
-
-                value.Add(point, CreateBottle());
-                totalBottleStreak++;
-            }
-            bottlesLeft = value.Values.Count;
-            return value;
+            currentlySelectedRecipies.Clear();
+            hasCoinBooster = 1;
         }
-        private Dictionary<(int, int), Fruit> GenerateFruits()
-        {
-            Dictionary<(int, int), Fruit> value = new();
-            foreach (Recipie rec in randomlyChoosenRecipies)
-            {
-                (int, int) point = GenerateRandomGridPoint();
-                Fruit fruit = CreateFruit(rec);
-                value.Add(point, fruit);
-            }
-            return value;
-        }
-
-        private Bottle CreateBottle()
-        {
-            Bottle bottle = Instantiate(bottlePrefab, tableSystem.spawnedItems);
-            bottle.CreateData(GenerateRandomRecipies(), OnBottleSelected);
-            bottle.gameObject.SetActive(true);
-            return bottle;
-        }
-        private Fruit CreateFruit(Recipie recipie)
-        {
-            Fruit fruit = Instantiate(fruitPrefab, tableSystem.spawnedItems);
-            fruit.CreateData(recipie, OnFruitAdded);
-            fruit.gameObject.SetActive(true);
-            return fruit;
-        }
-
-        private (int, int) GenerateRandomGridPoint()
-        {
-            int randIndex = UnityEngine.Random.Range(0, randIndicies.Count);
-            (int, int) point = randIndicies[randIndex];
-            randIndicies.RemoveAt(randIndex);
-            return point;
-        }
-
-        private List<Recipie> GenerateRandomRecipies()
-        {
-            (int, int) range = _data.GetReceipeRangeForLevel();
-            int randRecpCount = UnityEngine.Random.Range(range.Item1, range.Item2);
-
-
-            recipieIndicies = Enumerable.Range(0, availableReciepe.Count - 1).ToList();
-            List<Recipie> data = new();
-            for (int i = 0; i < randRecpCount; i++)
-            {
-                int index = UnityEngine.Random.Range(0, recipieIndicies.Count);
-                int val = recipieIndicies[index];
-
-                Recipie recipie = availableReciepe[val];
-                data.Add(recipie);
-                if (!randomlyChoosenRecipies.Contains(recipie))
-                {
-                    randomlyChoosenRecipies.Add(recipie);
-                }
-
-                recipieIndicies.RemoveAt(index);
-            }
-            return data;
-
-        }
-
-        private void Callback_Clear_SelectedRecipies() => currentlySelectedRecipies.Clear();
         private void OnFruitAdded(Recipie recipie) => currentlySelectedRecipies.Add(recipie);
+        private void OnCoinBoosterAdded() => hasCoinBooster = 2;
 
         public void OnBottleSelected(List<Recipie> recipies, Vector2 pos)
         {
@@ -276,7 +302,7 @@ namespace WN
 
             if (currentlySelectedRecipies.SequenceEqual(recipies) && currentlySelectedRecipies.Count == recipies.Count)
             {
-                coin.Credit(recipies.Count * economy.cost_of_recipie, pos);
+                coin.Credit(recipies.Count * economy.cost_of_recipie * hasCoinBooster, pos);
                 database.Write_Coins();
 
                 tableSystem.BurnTableTiles();
@@ -295,30 +321,7 @@ namespace WN
             }
         }
 
-        private int ResolveCoinsByLevel(int level)
-        {
-            int coin = 0;
-            switch (level)
-            {
-                case 1:
-                    coin = 45;
-                    streakDuration = 10;
-                    break;
-                case 2:
-                    coin = 75;
-                    streakDuration = 45;
-                    break;
-                case 3:
-                    coin = 200;
-                    streakDuration = 40;
-                    break;
-                case 4:
-                    coin = 500;
-                    streakDuration = 40;
-                    break;
-            }
-            return coin;
-        }
+
 
         private void Show_DefaultAds() => Ads.Instance.Display(CompleteDefaultAds).Forget();
         private void CompleteDefaultAds() { tableSystem.isBoardActive = true; ContinueCallback(); }

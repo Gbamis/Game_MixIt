@@ -6,9 +6,10 @@ namespace WN
 {
     public class GamePlaySystem : MonoBehaviour
     {
+        private ProgressionData progressionData = new();
         [SerializeField] private AppEvent appEvent;
         [SerializeField] private Database database;
-        [SerializeField] private ProgressionData progressionData;
+
 
         [Header("Game Objectives")]
         [SerializeField] Objective_MakeDrink objective_MakeDrink;

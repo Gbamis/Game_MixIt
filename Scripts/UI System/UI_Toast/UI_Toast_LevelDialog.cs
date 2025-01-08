@@ -11,6 +11,8 @@ namespace WN
 {
     public class UI_Toast_LevelDialog : MonoBehaviour
     {
+        private RectTransform rect;
+
         private RectTransform titleRect;
         private RectTransform declineRect;
         private Color declineColor;
@@ -29,18 +31,27 @@ namespace WN
             titleRect = title.GetComponent<RectTransform>();
             declineColor = declineImage.color;
             declineRect = declineBtn.GetComponent<RectTransform>();
+            rect = GetComponent<RectTransform>();
         }
 
         private void OnEnable()
         {
             acceptBtn.gameObject.SetActive(false);
             declineBtn.gameObject.SetActive(false);
+            AnimateDialog().Forget();
+            AnimateLevelUp().Forget();
         }
         private void OnDisable()
         {
             acceptBtn.onClick.RemoveAllListeners();
             declineBtn.onClick.RemoveAllListeners();
         }
+
+        private void OnClose()
+        {
+            AnimateDialog(true).Forget();
+        }
+
 
         private void ApplyReward_From_Button() => Ads.Instance.Reward_Add_Coins(declineRect.position);
 
@@ -54,13 +65,13 @@ namespace WN
 
             declineImage.color = declineColor;
             declineBtn.interactable = true;
-            AnimateLevelUp().Forget();
+
 
             // continue game
             acceptBtn.onClick.AddListener(() =>
             {
                 accept?.Invoke();
-                gameObject.SetActive(false);
+                OnClose();
             });
 
             //show ads to gain coins
@@ -89,6 +100,24 @@ namespace WN
 
             acceptBtn.gameObject.SetActive(true);
             declineBtn.gameObject.SetActive(true);
+        }
+
+        private async UniTaskVoid AnimateDialog(bool close = false)
+        {
+            Vector2 original = rect.localScale;
+            Vector2 end = original;
+            end.x += .1f;
+            end.y += .1f;
+
+            await rect.DOScale(end, 0.2f).OnComplete(() =>
+            {
+                rect.DOScale(original, 0.2f);
+            });
+
+            if (close)
+            {
+                gameObject.SetActive(false);
+            }
         }
     }
 

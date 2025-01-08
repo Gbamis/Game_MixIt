@@ -8,7 +8,8 @@ namespace WN
     public class TableSystem : MonoBehaviour
     {
         private Action OnClearReciepies_callback;
-        private Action OnBurnSelected;
+        private Action tutorial_OnBurnSelected;
+        private Action tutorial_OnClearPerformed;
 
         private int unburnRemaining = 0;
         private bool isDragging;
@@ -24,22 +25,14 @@ namespace WN
         [SerializeField] private float x_Span;
         [SerializeField] private float y_span;
         public Transform spawnedItems;
+        public List<(int, int)> indexForRandomPoints = new();
 
 
-        private void OnEnable()
-        {
-            database.OnDatabaseChanged += Fetch_Unburn;
-        }
-
-        private void OnDisable()
-        {
-            database.OnDatabaseChanged -= Fetch_Unburn;
-        }
+        private void OnEnable() => database.OnDatabaseChanged += Fetch_Unburn;
+        private void OnDisable() => database.OnDatabaseChanged -= Fetch_Unburn;
 
         public void CreateGameGrid(int rowMax, int colMax, in List<(int, int)> index)
         {
-            //build table grid layout
-
             points = new (int, int)[rowMax, colMax];
 
             for (int col = 0; col < colMax; col++)
@@ -60,17 +53,21 @@ namespace WN
                     index.Add(point);
                 }
             }
+            indexForRandomPoints = index;
 
         }
 
-        public void SpawnGridItems(Dictionary<(int, int), Bottle> bottles,
-        Dictionary<(int, int), Fruit> fruits,
-         Action OnClearRecipies,
-         Action OnBurnTapped = null)
+        public void SpawnGridItems(
+            Dictionary<(int, int), Bottle> bottles,
+            Dictionary<(int, int), Fruit> fruits,
+            Action OnClearRecipies,
+            Action OnBurnTapped = null,
+            Action OnClear = null)
         {
 
             OnClearReciepies_callback = OnClearRecipies;
-            OnBurnSelected = OnBurnTapped;
+            tutorial_OnBurnSelected = OnBurnTapped;
+            tutorial_OnClearPerformed = OnClear;
 
             foreach (KeyValuePair<(int, int), Bottle> keyValue in bottles)
             {
@@ -86,6 +83,44 @@ namespace WN
                 Fruit fruit = keyValue.Value;
 
                 tableItem.Initialize(OnSelectTableTile, fruit);
+            }
+        }
+
+        public void SpawnGridItemsWithCoinBoost(
+           Dictionary<(int, int), Bottle> bottles,
+           Dictionary<(int, int), Fruit> fruits,
+           Dictionary<(int, int), CoinBooster> coinBooster,
+           Action OnClearRecipies,
+           Action OnBurnTapped = null,
+           Action OnClear = null)
+        {
+
+            OnClearReciepies_callback = OnClearRecipies;
+            tutorial_OnBurnSelected = OnBurnTapped;
+            tutorial_OnClearPerformed = OnClear;
+
+            foreach (KeyValuePair<(int, int), Bottle> keyValue in bottles)
+            {
+                TableItem tableItem = links[keyValue.Key];
+                Bottle bottle = keyValue.Value;
+
+                tableItem.Initialize(OnSelectTableTile, bottle);
+            }
+
+            foreach (KeyValuePair<(int, int), Fruit> keyValue in fruits)
+            {
+                TableItem tableItem = links[keyValue.Key];
+                Fruit fruit = keyValue.Value;
+
+                tableItem.Initialize(OnSelectTableTile, fruit);
+            }
+
+            foreach (KeyValuePair<(int, int), CoinBooster> keyValue in coinBooster)
+            {
+                TableItem tableItem = links[keyValue.Key];
+                CoinBooster coin = keyValue.Value;
+
+                tableItem.Initialize(OnSelectTableTile, coin);
             }
         }
 
@@ -112,6 +147,7 @@ namespace WN
 
         private void CheckDrag()
         {
+
             if (!isBoardActive) { return; }
 
             if (OnClearReciepies_callback == null) { return; }
@@ -125,17 +161,46 @@ namespace WN
             }
         }
 
+        /* private void CheckDrag()
+         {
+             Touch touch = Input.GetTouch(0);
+
+             if (!isBoardActive) { return; }
+
+             if (OnClearReciepies_callback == null) { return; }
+
+             if (touch.tapCount > 1)
+             {
+
+             }
+
+             if (touch.phase == TouchPhase.Began && !isDragging) { isDragging = true; }
+
+
+             bool check = touch.phase == TouchPhase.Ended && isDragging;
+             bool taps = touch.tapCount > 1;
+
+             if (check || taps)
+             {
+                 OnClearReciepies_callback();
+                 DeSelectAllTableTile();
+                 isDragging = false;
+             }
+         }*/
+
         public void OnSelectTableTile(TableItem tableItem)
         {
             if (!isBoardActive) { return; }
 
             if (tableItem.isUsed || selectedTableTiles.Contains(tableItem))
             {
+                tutorial_OnBurnSelected?.Invoke();
+
                 if (unburnRemaining > 0)
                 {
                     if (tableItem.TryUnBurn())
                     {
-                        OnBurnSelected?.Invoke();
+                        tutorial_OnClearPerformed?.Invoke();
 
                         tableItem.UnSelect();
                         selectedTableTiles.Remove(tableItem);
@@ -172,11 +237,6 @@ namespace WN
             {
                 item.UnSelect();
                 item.Burn();
-                if (!item.IsSoftItem())
-                {
-
-                }
-
             }
             selectedTableTiles.Clear();
         }

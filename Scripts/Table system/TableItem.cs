@@ -22,6 +22,7 @@ namespace WN
 
         [SerializeField] private RectTransform rect;
         [SerializeField] private Image bg;
+        [SerializeField] private ThemeConfig themeConfig;
 
         public void Initialize(Action<TableItem> pointerAction, ITableContent item = null)
         {
@@ -127,7 +128,7 @@ namespace WN
             while (sec < 2 && selected)
             {
                 sec += Time.deltaTime * 1.5f;
-                bg.color = Color.Lerp(Color.black, selectColor, sec);
+                bg.color = Color.Lerp(themeConfig.tileSelectionColor, selectColor, sec);
                 await UniTask.Yield();
             }
             if (!selected)

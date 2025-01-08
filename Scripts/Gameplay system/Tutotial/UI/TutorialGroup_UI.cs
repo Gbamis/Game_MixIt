@@ -54,6 +54,7 @@ namespace WN
 
         public void SubmitTutorialInput(TutorialInput input)
         {
+            Debug.Log(input.name);
             if (input.name == expected_input.name)
             {
                 NextStep();

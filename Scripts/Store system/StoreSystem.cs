@@ -73,7 +73,7 @@ namespace WN
         {
             add_two_unburn = new()
             {
-                description = "(x2) Free a blocks",
+                description = "(x2) Free block",
                 buttonIcon = watchAds_sprite,
                 buttonText = "Free",
                 level_max = 1,
@@ -83,7 +83,7 @@ namespace WN
 
             buy_unburns = new()
             {
-                description = "Clear 2 blocks",
+                description = "Refill (x2) Free block",
                 buttonIcon = payment_sprite,
                 buttonText = "$0.9",
                 level_max = 1,
@@ -92,7 +92,7 @@ namespace WN
 
             add_time_reset = new()
             {
-                description = "(x2) Reset Time",
+                description = "(x2) Time Reset",
                 buttonIcon = watchAds_sprite,
                 buttonText = "Free",
                 level_max = 2,
@@ -101,7 +101,7 @@ namespace WN
 
             add_four_unburn = new()
             {
-                description = "(x4) Free a blocks",
+                description = "(x4) Free block",
                 buttonIcon = watchAds_sprite,
                 buttonText = "Free",
                 level_max = 3,

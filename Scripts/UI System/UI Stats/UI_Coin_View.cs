@@ -1,5 +1,6 @@
 using UnityEngine.UI;
 using UnityEngine;
+using TMPro;
 
 namespace WN
 {
@@ -10,9 +11,8 @@ namespace WN
         [SerializeField] private Coin coin;
         [SerializeField] private Transform root;
         [SerializeField] private UI_AddCoin ui_addCoinPrefab;
-        [SerializeField] private Text balannce;
-        [SerializeField] private Text targetCoin;
-        [SerializeField] private Image progressBar;
+        [SerializeField] private TextMeshProUGUI balannce;
+        [SerializeField] private TextMeshProUGUI targetCoin;
 
         private void OnEnable()
         {
@@ -35,7 +35,6 @@ namespace WN
             if (balannce != null)
             {
                 balannce.text = coin.account_balance.ToString();
-                progressBar.fillAmount = (float)coin.account_balance / maxCoin;
             }
             if (ui_addCoinPrefab != null)
             {
@@ -52,9 +51,8 @@ namespace WN
 
         public void SetTargetCoin(int val)
         {
-            targetCoin.text = val.ToString();
+            targetCoin.text = "/"+val.ToString();
             maxCoin = val;
-            progressBar.fillAmount = (float)coin.account_balance / maxCoin;
         }
     }
 

@@ -16,7 +16,7 @@ namespace WN
 
         public int GetNextLevelTargetCoins(int coin)
         {
-            int val = LEVEL++ * 20;
+            int val = LEVEL + 1 * 20;
             if (coin > val)
             {
                 val += coin + (LEVEL * 10);
@@ -33,10 +33,10 @@ namespace WN
                     range = (1, 2);
                     break;
                 case 2:
-                    range = (1, 2);
+                    range = (2, 3);
                     break;
                 case 3:
-                    range = (2, 3);
+                    range = (2, 4);
                     break;
                 case 4:
                 case 5:

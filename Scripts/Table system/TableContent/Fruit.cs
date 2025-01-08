@@ -8,7 +8,7 @@ namespace WN
 {
     public class Fruit : MonoBehaviour, ITableContent
     {
-        private bool inUse;
+        //private bool inUse;
         public bool soft { set; get; }
         private Action<Recipie> OnAdd;
         private Recipie recipie;

@@ -49,7 +49,7 @@ namespace WN
 
             await menuRect.DOScale(end, 0.4f).SetEase(Ease.OutBounce).OnComplete(() =>
             {
-                menuRect.DOScale(original, 0.2f);
+                menuRect.DOScale(original, 0.3f);
             });
             Time.timeScale = 0;
 
